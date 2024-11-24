@@ -5,22 +5,23 @@ class DBClient {
     const host = process.env.DB_HOST || 'localhost';
     const port = process.env.DB_PORT || 27017;
     const database = process.env.DB_DATABASE || 'files_manager';
-
-    // Construct the MongoDB URI including the database name
     const uri = `mongodb://${host}:${port}/${database}`;
-    this.databaseName = database;
 
-    this.connected = false; // Initial state to track connection status
+    this.databaseName = database;
+    this.connected = false;
+    this.connecting = false;  // Flag to manage connection attempts
 
     this.client = new MongoClient(uri, {
       useUnifiedTopology: true,
     });
 
-    // Connect to the database upon instance creation
     this.connectToDatabase();
   }
 
   async connectToDatabase() {
+    if (this.connecting || this.connected) return;
+    this.connecting = true;
+
     try {
       await this.client.connect();
       console.log('MongoDB client connected successfully');
@@ -28,23 +29,20 @@ class DBClient {
     } catch (err) {
       console.error(`MongoDB connection error: ${err.message}`);
       this.connected = false;
-
-      // Retry connection after 1 second, handling errors in retry logic
-      setTimeout(() => {
-        this.connectToDatabase().catch(err => console.error('Retry connection failed:', err))
-      }, 1000);
+      setTimeout(() => this.connectToDatabase(), 1000);
+    } finally {
+      this.connecting = false;
     }
   }
 
   isAlive() {
-    // Return the actual connection status
     return this.connected;
   }
 
   async nbUsers() {
     if (!this.connected) {
       console.error('Database not connected.');
-      return 0; // Return 0 if not connected to prevent errors
+      return 0;
     }
     try {
       const db = this.client.db(this.databaseName);
@@ -58,7 +56,7 @@ class DBClient {
   async nbFiles() {
     if (!this.connected) {
       console.error('Database not connected.');
-      return 0; // Return 0 if not connected to prevent errors
+      return 0;
     }
     try {
       const db = this.client.db(this.databaseName);
@@ -70,7 +68,6 @@ class DBClient {
   }
 }
 
-// Create and export an instance of DBClient
 const dbClient = new DBClient();
 
 export default dbClient;
