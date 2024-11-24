@@ -19,40 +19,41 @@ class DBClient {
   }
 
   async connectToDatabase() {
-    if (this.connecting || this.connected) return;
     this.connecting = true;
-
     try {
-      await this.client.connect();
-      console.log('MongoDB client connected successfully');
-      this.connected = true;
+        await this.client.connect();
+        console.log('MongoDB client connected successfully');
+        this.connected = true;
     } catch (err) {
-      console.error(`MongoDB connection error: ${err.message}`);
-      this.connected = false;
-      setTimeout(() => this.connectToDatabase(), 1000);
+        console.error(`MongoDB connection error: ${err.message}`);
+        this.connected = false;
     } finally {
-      this.connecting = false;
+        this.connecting = false;
     }
-  }
+}
+
 
   isAlive() {
-    return this.connected;
-  }
+    return this.client && this.client.topology && this.client.topology.isConnected();
+}
 
-  async nbUsers() {
-    if (!this.connected) {
+
+async nbUsers() {
+  if (!this.connected) {
       console.error('Database not connected.');
       return 0;
-    }
-    try {
-      const db = this.client.db(this.databaseName);
-      return await db.collection('users').countDocuments();
-    } catch (err) {
-      console.error(`Error fetching user count: ${err.message}`);
-      return 0;
-    }
   }
+  try {
+      const db = this.client.db(this.databaseName);
+      const count = await db.collection('users').countDocuments();
+      return count;
+  } catch (err) {
+      console.error(`Error fetching user count: ${err.message}`);
+      return 0; // Ensure returning 0 on error
+  }
+}
 
+  
   async nbFiles() {
     if (!this.connected) {
       console.error('Database not connected.');
@@ -63,11 +64,11 @@ class DBClient {
       return await db.collection('files').countDocuments();
     } catch (err) {
       console.error(`Error fetching file count: ${err.message}`);
-      return 0;
+      return 0;  // Ensure returning 0 on error
     }
   }
 }
 
-const dbClient = new DBClient();
+let dbClient = new DBClient();
 
 export default dbClient;
