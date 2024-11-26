@@ -33,11 +33,9 @@ class DBClient {
     }
 }
 
-
-  isAlive() {
-    return this.client && this.client.topology && this.client.topology.isConnected();
+isAlive() {
+  return this.connected;
 }
-
 
 async nbUsers() {
   if (!this.connected) {
