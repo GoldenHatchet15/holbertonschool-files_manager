@@ -7,68 +7,58 @@ class DBClient {
     const database = process.env.DB_DATABASE || 'files_manager';
     const uri = `mongodb://${host}:${port}/${database}`;
 
-    this.databaseName = database;
-    this.connected = false;
-    this.connecting = false;  // Flag to manage connection attempts
-
     this.client = new MongoClient(uri, {
       useUnifiedTopology: true,
     });
 
-    this.connectToDatabase();
+    this.databaseName = database;
+    this.connected = false; // Track the connection status
+
+    this.connectToDatabase(); // Start connecting to the database
   }
 
   async connectToDatabase() {
-    this.connecting = true;
     try {
-        await this.client.connect();
-        console.log('MongoDB client connected successfully');
-        this.connected = true;
-    } catch (err) {
-        console.error(`MongoDB connection error: ${err.message}`);
-        this.connected = false;
-    } finally {
-        this.connecting = false;
+      await this.client.connect();
+      this.connected = true;
+      console.log('MongoDB client connected successfully');
+    } catch (error) {
+      console.error(`MongoDB connection error: ${error.message}`);
     }
-}
-
+  }
 
   isAlive() {
-    return this.client && this.client.topology && this.client.topology.isConnected();
-}
-
-
-async nbUsers() {
-  if (!this.connected) {
-      console.error('Database not connected.');
-      return 0;
+    // Check the connection status
+    return this.connected && this.client.topology && this.client.topology.isConnected();
   }
-  try {
+
+  async nbUsers() {
+    // Return 0 if the database is not connected
+    if (!this.isAlive()) return 0;
+
+    try {
       const db = this.client.db(this.databaseName);
-      const count = await db.collection('users').countDocuments();
-      return count;
-  } catch (err) {
-      console.error(`Error fetching user count: ${err.message}`);
-      return 0; // Ensure returning 0 on error
-  }
-}
-
-  
-  async nbFiles() {
-    if (!this.connected) {
-      console.error('Database not connected.');
+      return await db.collection('users').countDocuments();
+    } catch (error) {
+      console.error(`Error fetching user count: ${error.message}`);
       return 0;
     }
+  }
+
+  async nbFiles() {
+    // Return 0 if the database is not connected
+    if (!this.isAlive()) return 0;
+
     try {
       const db = this.client.db(this.databaseName);
       return await db.collection('files').countDocuments();
-    } catch (err) {
-      console.error(`Error fetching file count: ${err.message}`);
-      return 0;  // Ensure returning 0 on error
+    } catch (error) {
+      console.error(`Error fetching file count: ${error.message}`);
+      return 0;
     }
   }
 }
 
-let dbClient = new DBClient();
-
+// Export an instance of DBClient
+const dbClient = new DBClient();
 export default dbClient;
