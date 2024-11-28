@@ -12,7 +12,7 @@ class DBClient {
     this.client = new MongoClient(uri, { useUnifiedTopology: true });
     this.connected = false;
 
-    // Initiate connection immediately
+    // Begin connection process
     this.initConnection();
   }
 
@@ -28,7 +28,7 @@ class DBClient {
   }
 
   isAlive() {
-    // Return true if the MongoClient reports the topology is connected
+    // Check the connection status synchronously
     return this.client.topology && this.client.topology.isConnected();
   }
 
