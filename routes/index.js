@@ -3,8 +3,11 @@ import AppController from '../controllers/AppController';
 
 const router = Router();
 
-// Define the /status route
+// Define API routes
 router.get('/status', AppController.getStatus);
+router.get('/stats', AppController.getStats);
 
-// Export the router directly
-export default router;
+// Attach routes to the app
+export default (app) => {
+  app.use('/', router);
+};
