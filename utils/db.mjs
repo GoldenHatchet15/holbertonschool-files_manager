@@ -29,14 +29,14 @@ class DBClient {
   }
 
   isAlive() {
-    // Check if the connection has been established
+    // Return connection status immediately without waiting for promises
     return this.connected && this.client.topology && this.client.topology.isConnected();
   }
 
   async nbUsers() {
     // Ensure database is connected before querying
     await this.connectionPromise; // Wait for the connection to resolve or fail
-    if (!this.isAlive()) return 0;
+    if (!this.connected) return 0;
 
     try {
       const db = this.client.db(this.databaseName);
@@ -51,7 +51,7 @@ class DBClient {
   async nbFiles() {
     // Ensure database is connected before querying
     await this.connectionPromise; // Wait for the connection to resolve or fail
-    if (!this.isAlive()) return 0;
+    if (!this.connected) return 0;
 
     try {
       const db = this.client.db(this.databaseName);
