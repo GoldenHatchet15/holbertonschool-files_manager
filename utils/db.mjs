@@ -10,6 +10,7 @@ class DBClient {
 
     this.databaseName = database;
     this.client = new MongoClient(uri, { useUnifiedTopology: true });
+
     this.connected = false;
 
     // Begin connection process
