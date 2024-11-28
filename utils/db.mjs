@@ -1,5 +1,5 @@
-import mongodb from 'mongodb'; // Import the entire mongodb module
-const { MongoClient } = mongodb; // Destructure MongoClient from the module
+import mongodb from 'mongodb'; // Import mongodb
+const { MongoClient } = mongodb; // Destructure MongoClient from mongodb
 
 class DBClient {
   constructor() {
@@ -12,8 +12,9 @@ class DBClient {
     this.client = new MongoClient(uri, {
       useUnifiedTopology: true,
     });
+
     this.connected = false; // Tracks connection status
-    this.connectToDatabase(); // Start connecting to the database
+    this.connectionPromise = this.connectToDatabase(); // Store the promise for connection handling
   }
 
   async connectToDatabase() {
@@ -23,20 +24,24 @@ class DBClient {
       console.log('MongoDB client connected successfully');
     } catch (error) {
       console.error(`MongoDB connection error: ${error.message}`);
-      this.connected = false; // Ensure connection status is updated
+      this.connected = false; // Ensure the connected flag is false on failure
     }
   }
 
   isAlive() {
-    // Returns false if not connected
+    // Check if the connection has been established
     return this.connected && this.client.topology && this.client.topology.isConnected();
   }
 
   async nbUsers() {
+    // Ensure database is connected before querying
+    await this.connectionPromise; // Wait for the connection to resolve or fail
     if (!this.isAlive()) return 0;
+
     try {
       const db = this.client.db(this.databaseName);
-      return await db.collection('users').countDocuments();
+      const count = await db.collection('users').countDocuments();
+      return count;
     } catch (error) {
       console.error(`Error fetching user count: ${error.message}`);
       return 0;
@@ -44,10 +49,14 @@ class DBClient {
   }
 
   async nbFiles() {
+    // Ensure database is connected before querying
+    await this.connectionPromise; // Wait for the connection to resolve or fail
     if (!this.isAlive()) return 0;
+
     try {
       const db = this.client.db(this.databaseName);
-      return await db.collection('files').countDocuments();
+      const count = await db.collection('files').countDocuments();
+      return count;
     } catch (error) {
       console.error(`Error fetching file count: ${error.message}`);
       return 0;
@@ -55,6 +64,11 @@ class DBClient {
   }
 }
 
-// Export the singleton instance
+// Global error handling for unhandled promise rejections
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled Promise Rejection:', reason);
+});
+
+// Export singleton instance of DBClient
 const dbClient = new DBClient();
 export default dbClient;
