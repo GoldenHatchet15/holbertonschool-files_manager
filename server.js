@@ -1,4 +1,4 @@
-import { beforeAll, describe } from '@jest/globals';
+/* eslint jest/require-hook: "off" */
 import express from 'express';
 import router from './routes/index';
 
@@ -8,11 +8,11 @@ const port = process.env.PORT || 5000;
 // Load all routes
 router(app);
 
-// Start the server
-describe('server setup', () => {
-  beforeAll(() => {
-    app.listen(port, () => {
-      console.log(`Server running on port ${port}`);
-    });
+// Start the server only when not in testing mode
+if (process.env.NODE_ENV !== 'test') {
+  app.listen(port, () => {
+    console.log(`Server running on port ${port}`);
   });
-});
+}
+
+export default app; // Export the app for testing

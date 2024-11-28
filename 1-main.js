@@ -1,3 +1,4 @@
+/* eslint jest/require-hook: "off" */
 import dbClient from './utils/db';
 
 const waitConnection = () => new Promise((resolve, reject) => {

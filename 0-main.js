@@ -1,3 +1,4 @@
+/* eslint jest/require-hook: "off" */
 import redisClient from './utils/redis';
 
 (async () => {
