@@ -9,12 +9,11 @@ class DBClient {
     const uri = `mongodb://${host}:${port}/${database}`;
 
     this.databaseName = database;
-    this.client = new MongoClient(uri, {
-      useUnifiedTopology: true,
-    });
+    this.client = new MongoClient(uri, { useUnifiedTopology: true });
+    this.connected = false;
 
-    this.connected = false; // Tracks connection status
-    this.initConnection(); // Start the connection process
+    // Initiate connection immediately
+    this.initConnection();
   }
 
   async initConnection() {
@@ -29,8 +28,8 @@ class DBClient {
   }
 
   isAlive() {
-    // Check both the connection status and MongoDB client topology
-    return this.connected && this.client.topology && this.client.topology.isConnected();
+    // Return true if the MongoClient reports the topology is connected
+    return this.client.topology && this.client.topology.isConnected();
   }
 
   async nbUsers() {
