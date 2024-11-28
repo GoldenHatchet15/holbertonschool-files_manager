@@ -1,50 +1,31 @@
-import { MongoClient, ObjectId } from 'mongodb';
-import crypto from 'crypto';
-import dbClient from '../utils/db';
+import redisClient from '../utils/redis.js';
+import dbClient from '../utils/db.js';
 
 class UsersController {
   /**
-   * POST /users endpoint to create a new user
+   * GET /users/me - Retrieve the current user
    */
-  static async postNew(req, res) {
-    const { email, password } = req.body;
+  static async getMe(req, res) {
+    const token = req.headers['x-token'];
 
-    // Validate email
-    if (!email) {
-      return res.status(400).json({ error: 'Missing email' });
+    if (!token) {
+      return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    // Validate password
-    if (!password) {
-      return res.status(400).json({ error: 'Missing password' });
+    const key = `auth_${token}`;
+    const userId = await redisClient.get(key);
+
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const usersCollection = dbClient.db.collection('users');
+    const user = await dbClient.db.collection('users').findOne({ _id: dbClient.getObjectId(userId) });
 
-    try {
-      // Check if email already exists in the database
-      const existingUser = await usersCollection.findOne({ email });
-      if (existingUser) {
-        return res.status(400).json({ error: 'Already exist' });
-      }
-
-      // Hash the password using SHA1
-      const sha1Password = crypto.createHash('sha1').update(password).digest('hex');
-
-      // Insert new user into the database
-      const newUser = {
-        email,
-        password: sha1Password,
-      };
-
-      const result = await usersCollection.insertOne(newUser);
-
-      // Respond with the new user's id and email
-      return res.status(201).json({ id: result.insertedId, email });
-    } catch (error) {
-      console.error('Error creating new user:', error);
-      return res.status(500).json({ error: 'Internal Server Error' });
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
     }
+
+    return res.status(200).json({ id: user._id, email: user.email });
   }
 }
 
