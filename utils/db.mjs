@@ -1,4 +1,5 @@
-import { MongoClient } from 'mongodb';
+import mongodb from 'mongodb'; // Import the entire mongodb module
+const { MongoClient } = mongodb; // Destructure MongoClient from the module
 
 class DBClient {
   constructor() {
@@ -7,13 +8,11 @@ class DBClient {
     const database = process.env.DB_DATABASE || 'files_manager';
     const uri = `mongodb://${host}:${port}/${database}`;
 
+    this.databaseName = database;
     this.client = new MongoClient(uri, {
       useUnifiedTopology: true,
     });
-
-    this.databaseName = database;
-    this.connected = false; // Track the connection status
-
+    this.connected = false; // Tracks connection status
     this.connectToDatabase(); // Start connecting to the database
   }
 
@@ -24,18 +23,17 @@ class DBClient {
       console.log('MongoDB client connected successfully');
     } catch (error) {
       console.error(`MongoDB connection error: ${error.message}`);
+      this.connected = false; // Ensure connection status is updated
     }
   }
 
   isAlive() {
-    // Check the connection status
+    // Returns false if not connected
     return this.connected && this.client.topology && this.client.topology.isConnected();
   }
 
   async nbUsers() {
-    // Return 0 if the database is not connected
     if (!this.isAlive()) return 0;
-
     try {
       const db = this.client.db(this.databaseName);
       return await db.collection('users').countDocuments();
@@ -46,9 +44,7 @@ class DBClient {
   }
 
   async nbFiles() {
-    // Return 0 if the database is not connected
     if (!this.isAlive()) return 0;
-
     try {
       const db = this.client.db(this.databaseName);
       return await db.collection('files').countDocuments();
@@ -59,6 +55,6 @@ class DBClient {
   }
 }
 
-// Export an instance of DBClient
+// Export the singleton instance
 const dbClient = new DBClient();
 export default dbClient;
