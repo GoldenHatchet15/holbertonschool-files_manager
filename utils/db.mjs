@@ -17,21 +17,22 @@ class DBClient {
   }
 
   isAlive() {
-    console.log('MongoDB Topology:', this.client.topology?.isConnected());
+    console.log('MongoDB Topology Status:', this.client.topology?.isConnected());
     return this.client.topology && this.client.topology.isConnected();
   }
   
   async initConnection() {
     try {
-      console.log('Attempting to connect to MongoDB...');
+      console.log('Attempting to connect to MongoDB at mongodb://127.0.0.1:27017/files_manager...');
       await this.client.connect();
       console.log('MongoDB client connected successfully');
-      this.connected = true;
     } catch (error) {
       console.error(`MongoDB connection error: ${error.message}`);
-      this.connected = false;
     }
+    await new Promise(resolve => setTimeout(resolve, 1000)); // Add a delay to ensure readiness
   }
+  
+
   async nbUsers() {
     if (!this.isAlive()) return 0;
 
