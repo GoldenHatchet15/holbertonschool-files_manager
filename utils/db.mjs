@@ -16,22 +16,22 @@ class DBClient {
     this.initConnection();
   }
 
+  isAlive() {
+    console.log('MongoDB Topology:', this.client.topology?.isConnected());
+    return this.client.topology && this.client.topology.isConnected();
+  }
+  
   async initConnection() {
     try {
+      console.log('Attempting to connect to MongoDB...');
       await this.client.connect();
-      this.connected = true;
       console.log('MongoDB client connected successfully');
+      this.connected = true;
     } catch (error) {
       console.error(`MongoDB connection error: ${error.message}`);
       this.connected = false;
     }
   }
-
-  isAlive() {
-    // Check the connection status synchronously
-    return this.client.topology && this.client.topology.isConnected();
-  }
-
   async nbUsers() {
     if (!this.isAlive()) return 0;
 
