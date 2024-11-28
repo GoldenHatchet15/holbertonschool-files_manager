@@ -4,8 +4,8 @@ import router from './routes/index';
 const app = express();
 const port = process.env.PORT || 5000;
 
-// Load all routes
-router(app);
+// Use the routes
+app.use('/', router);
 
 // Start the server
 app.listen(port, () => {
