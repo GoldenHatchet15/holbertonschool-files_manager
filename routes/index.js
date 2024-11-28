@@ -1,6 +1,5 @@
-/* eslint jest/require-hook: "off" */
 import { Router } from 'express';
-import AppController from '../controllers/AppController';
+import AppController from '../controllers/AppController.js';
 
 const router = Router();
 
@@ -8,6 +7,5 @@ const router = Router();
 router.get('/status', AppController.getStatus);
 router.get('/stats', AppController.getStats);
 
-export default (app) => {
-  app.use('/', router);
-};
+// Export the router
+export default router;

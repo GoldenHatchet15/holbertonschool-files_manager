@@ -17,10 +17,10 @@ class DBClient {
   }
 
   isAlive() {
-    console.log('MongoDB Topology Status:', this.client.topology?.isConnected());
-    return this.client.topology && this.client.topology.isConnected();
+    console.log('MongoDB Topology Status:', this.client?.isConnected());
+    return this.client?.isConnected(); // Use client.isConnected()
+}
 
-  }
   
   async initConnection() {
     try {
