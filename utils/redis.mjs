@@ -18,19 +18,43 @@ class RedisClient {
     });
   }
 
-  isAlive() {
-    return this.client.isReady;
-  }
+  //isAlive() {
+  //  return this.client.isReady;
+  //}
 
+  async isAlive() {
+    try {
+      const result = await this.client.ping();
+      console.log(`Redis PING result: ${result}`);
+      return result === 'PONG';
+    } catch (err) {
+      console.error('Redis PING failed:', err);
+      return false;
+    }
+  }
+  
   async get(key) {
     console.log(`Attempting to get key: ${key} from Redis`);
+    const startTime = Date.now();
+  
     return new Promise((resolve, reject) => {
+      // Set a timeout to handle cases where the operation gets stuck
+      const timeout = setTimeout(() => {
+        const duration = Date.now() - startTime;
+        console.error(`Redis GET operation timed out for key: ${key} (took ${duration}ms)`);
+        reject(new Error(`Redis GET operation timed out for key: ${key}`));
+      }, 5000); // 5-second timeout
+  
       this.client.get(key, (err, reply) => {
+        clearTimeout(timeout); // Clear timeout on success or error
+        const duration = Date.now() - startTime;
+  
         if (err) {
-          console.error(`Error getting key "${key}" from Redis: ${err}`);
+          console.error(`Error getting key "${key}" from Redis (took ${duration}ms): ${err}`);
           return reject(err);
         }
-        console.log(`Successfully retrieved key "${key}" from Redis: ${reply}`);
+  
+        console.log(`Successfully retrieved key "${key}" from Redis: ${reply} (took ${duration}ms)`);
         resolve(reply);
       });
     });
