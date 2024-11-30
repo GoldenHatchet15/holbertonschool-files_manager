@@ -4,47 +4,48 @@ class RedisClient {
   constructor() {
     this.client = createClient();
 
-    this.connected = true; // Assume the connection is successful for the first `isAlive` call
-
     this.client.on('error', (err) => {
       console.error(`Redis client error: ${err}`);
-      this.connected = false; // Update to false if an error occurs
     });
 
     this.client.on('ready', () => {
       console.log('Redis client connected successfully');
-      this.connected = true; // Update the connection state accurately
+    });
+
+    // Connect the client explicitly
+    this.client.connect().catch((err) => {
+      console.error(`Redis client connection error: ${err}`);
     });
   }
 
   isAlive() {
-    return this.connected; // Return the current connection state
+    return this.client.isReady;
   }
 
   async get(key) {
+    console.log(`Attempting to get key: ${key} from Redis`);
     return new Promise((resolve, reject) => {
       this.client.get(key, (err, reply) => {
         if (err) {
-          console.error(`Error fetching key "${key}": ${err}`);
-          reject(err);
-        } else {
-          resolve(reply);
+          console.error(`Error getting key "${key}" from Redis: ${err}`);
+          return reject(err);
         }
+        console.log(`Successfully retrieved key "${key}" from Redis: ${reply}`);
+        resolve(reply);
       });
     });
   }
+  
 
   async set(key, value, duration) {
-    return new Promise((resolve, reject) => {
-      this.client.set(key, value, 'EX', duration, (err, reply) => {
-        if (err) {
-          console.error(`Error setting key "${key}": ${err}`);
-          reject(err);
-        } else {
-          resolve(reply);
-        }
-      });
-    });
+    console.log(`Attempting to set key: ${key} with value: ${value} and duration: ${duration}s`);
+    try {
+      await this.client.set(key, value, 'EX', duration); // Ensure this line executes properly
+      console.log(`Key set successfully: ${key}`);
+    } catch (err) {
+      console.error(`Error setting key in Redis: ${err}`);
+      throw err; // Re-throw the error to be handled in the caller
+    }
   }
 
   async del(key) {
