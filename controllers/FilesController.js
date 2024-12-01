@@ -177,6 +177,49 @@ class FilesController {
       return res.status(500).json({ error: 'Internal Server Error' });
     }
   }
+
+  static async putPublish(req, res) {
+    await FilesController.updateFilePublishState(req, res, true);
+  }
+
+  static async putUnpublish(req, res) {
+    await FilesController.updateFilePublishState(req, res, false);
+  }
+
+  static async updateFilePublishState(req, res, isPublic) {
+    try {
+      const token = req.headers['x-token'];
+      if (!token) return res.status(401).json({ error: 'Unauthorized' });
+
+      const userId = await redisClient.get(`auth_${token}`);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+      const { id } = req.params;
+      const fileId = new ObjectId(id);
+
+      const file = await dbClient.db.collection('files').findOne({ _id: fileId, userId: new ObjectId(userId) });
+      if (!file) return res.status(404).json({ error: 'Not found' });
+
+      await dbClient.db.collection('files').updateOne(
+        { _id: fileId },
+        { $set: { isPublic } }
+      );
+
+      const updatedFile = await dbClient.db.collection('files').findOne({ _id: fileId });
+
+      return res.status(200).json({
+        id: updatedFile._id,
+        userId: updatedFile.userId,
+        name: updatedFile.name,
+        type: updatedFile.type,
+        isPublic: updatedFile.isPublic,
+        parentId: updatedFile.parentId || 0,
+      });
+    } catch (err) {
+      console.error('Error in updating file publish state:', err);
+      return res.status(500).json({ error: 'Internal Server Error' });
+    }
+  }
 }
 
 export default FilesController;
