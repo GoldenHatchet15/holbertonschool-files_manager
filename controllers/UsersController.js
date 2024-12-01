@@ -42,34 +42,41 @@ class UsersController {
         console.log('Missing token in request');
         return res.status(401).json({ error: 'Unauthorized' });
       }
-
+  
       const key = `auth_${token}`;
       console.log(`Fetching user ID from Redis with key: ${key}`);
       const userId = await redisClient.get(key);
-
+  
       if (!userId) {
         console.log('Token not found in Redis or expired');
         return res.status(401).json({ error: 'Unauthorized' });
       }
-
+  
       console.log(`User ID retrieved from Redis: ${userId}`);
       console.log('Querying MongoDB for user...');
-
-      // Convert userId to ObjectId before querying MongoDB
-      const user = await dbClient.db.collection('users').findOne({ _id: new ObjectId(userId) });
-
-      if (!user) {
-        console.log('User not found in MongoDB');
-        return res.status(404).json({ error: 'User not found' });
+  
+      try {
+        const objectId = new ObjectId(userId);
+        console.log(`Converted userId to ObjectId: ${objectId}`);
+        const user = await dbClient.db.collection('users').findOne({ _id: objectId });
+  
+        if (!user) {
+          console.log('User not found in MongoDB');
+          return res.status(404).json({ error: 'User not found' });
+        }
+  
+        console.log('User retrieved successfully:', user);
+        return res.status(200).json({ id: user._id, email: user.email });
+      } catch (mongoError) {
+        console.error('Error querying MongoDB:', mongoError);
+        return res.status(500).json({ error: 'Internal Server Error' });
       }
-
-      console.log('User retrieved successfully');
-      return res.status(200).json({ id: user._id, email: user.email });
     } catch (err) {
       console.error('Error in /users/me:', err);
       return res.status(500).json({ error: 'Internal Server Error' });
     }
   }
+  
 }
 
 export default UsersController;
