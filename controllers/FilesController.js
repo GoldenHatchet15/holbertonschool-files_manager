@@ -223,47 +223,67 @@ class FilesController {
 
   static async getFile(req, res) {
     try {
-      const { id } = req.params;
-      const token = req.headers['x-token'] || null;
-  
       console.log('Fetching file data...');
-      const file = await dbClient.db.collection('files').findOne({ _id: new ObjectId(id) });
-  
-      if (!file) {
-        console.log('File not found');
+      const { id } = req.params;
+      const token = req.headers['x-token'];
+
+      // Validate ObjectId
+      if (!ObjectId.isValid(id)) {
+        console.log('Invalid ObjectId');
         return res.status(404).json({ error: 'Not found' });
       }
-  
+
+      // Fetch file document from DB
+      const file = await dbClient.db.collection('files').findOne({ _id: new ObjectId(id) });
+      if (!file) {
+        console.log('File not found in DB');
+        return res.status(404).json({ error: 'Not found' });
+      }
+
+      console.log(`File retrieved: ${JSON.stringify(file)}`);
+
+      // Check if file is a folder
       if (file.type === 'folder') {
         console.log('File is a folder');
         return res.status(400).json({ error: "A folder doesn't have content" });
       }
-  
-      const isPublic = file.isPublic;
-      let userId = null;
-  
-      if (token) {
-        const key = `auth_${token}`;
-        console.log(`Fetching user ID from Redis with key: ${key}`);
-        userId = await redisClient.get(key);
-      }
-  
-      if (!isPublic && (!userId || userId !== file.userId.toString())) {
-        console.log('File is private and user is unauthenticated or not the owner');
+
+      // If file is not public and no user is authenticated
+      if (!file.isPublic && !token) {
+        console.log('File is not public and no user is authenticated');
         return res.status(404).json({ error: 'Not found' });
       }
-  
-      if (!fs.existsSync(file.localPath)) {
-        console.log('File not found on disk');
+
+      // If file is not public, validate the user
+      if (!file.isPublic) {
+        console.log('File is not public, validating user...');
+        const userId = await redisClient.get(`auth_${token}`);
+        if (!userId || userId !== file.userId.toString()) {
+          console.log('User is not authorized to access the file');
+          return res.status(404).json({ error: 'Not found' });
+        }
+        console.log('User validated successfully');
+      }
+
+      // Check if the file exists on disk
+      const localPath = file.localPath;
+      if (!localPath) {
+        console.log('File localPath is missing');
         return res.status(404).json({ error: 'Not found' });
       }
-  
-      const mimeType = mime.lookup(file.name);
-      res.setHeader('Content-Type', mimeType);
-      const fileContent = fs.readFileSync(file.localPath);
-      return res.status(200).send(fileContent);
+
+      try {
+        const fileData = await fs.readFile(localPath);
+        const mimeType = mime.lookup(file.name) || 'application/octet-stream';
+        res.setHeader('Content-Type', mimeType);
+        console.log('Returning file content');
+        return res.status(200).send(fileData);
+      } catch (err) {
+        console.error('Error reading file from disk:', err);
+        return res.status(404).json({ error: 'Not found' });
+      }
     } catch (err) {
-      console.error('Error in GET /files/:id/data:', err);
+      console.error('Error in getFile:', err);
       return res.status(500).json({ error: 'Internal Server Error' });
     }
   }
