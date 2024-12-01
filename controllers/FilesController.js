@@ -5,28 +5,22 @@ import mime from 'mime-types';
 import { ObjectId } from 'mongodb';
 import dbClient from '../utils/db';
 import redisClient from '../utils/redis';
+import Bull from 'bull';
+
+const fileQueue = new Bull('fileQueue');
 
 class FilesController {
   static async postUpload(req, res) {
     try {
-      // Authenticate user using token
       const token = req.headers['x-token'];
-      if (!token) {
-        return res.status(401).json({ error: 'Unauthorized' });
-      }
+      if (!token) return res.status(401).json({ error: 'Unauthorized' });
 
       const userId = await redisClient.get(`auth_${token}`);
-      if (!userId) {
-        return res.status(401).json({ error: 'Unauthorized' });
-      }
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
-      // Get input data
       const { name, type, parentId = 0, isPublic = false, data } = req.body;
 
-      // Validate inputs
-      if (!name) {
-        return res.status(400).json({ error: 'Missing name' });
-      }
+      if (!name) return res.status(400).json({ error: 'Missing name' });
       if (!type || !['folder', 'file', 'image'].includes(type)) {
         return res.status(400).json({ error: 'Missing type' });
       }
@@ -34,19 +28,13 @@ class FilesController {
         return res.status(400).json({ error: 'Missing data' });
       }
 
-      // Validate parentId if provided
       let parentFile = null;
       if (parentId !== 0) {
         parentFile = await dbClient.db.collection('files').findOne({ _id: new ObjectId(parentId) });
-        if (!parentFile) {
-          return res.status(400).json({ error: 'Parent not found' });
-        }
-        if (parentFile.type !== 'folder') {
-          return res.status(400).json({ error: 'Parent is not a folder' });
-        }
+        if (!parentFile) return res.status(400).json({ error: 'Parent not found' });
+        if (parentFile.type !== 'folder') return res.status(400).json({ error: 'Parent is not a folder' });
       }
 
-      // Prepare file data for database
       const fileDocument = {
         userId: new ObjectId(userId),
         name,
@@ -55,7 +43,9 @@ class FilesController {
         parentId: parentId === 0 ? '0' : new ObjectId(parentId),
       };
 
-      // Handle folder creation
+      const folderPath = process.env.FOLDER_PATH || '/tmp/files_manager';
+      if (!fs.existsSync(folderPath)) fs.mkdirSync(folderPath, { recursive: true });
+
       if (type === 'folder') {
         const result = await dbClient.db.collection('files').insertOne(fileDocument);
         return res.status(201).json({
@@ -68,18 +58,19 @@ class FilesController {
         });
       }
 
-      // Handle file/image creation
-      const folderPath = process.env.FOLDER_PATH || '/tmp/files_manager';
-      if (!fs.existsSync(folderPath)) {
-        fs.mkdirSync(folderPath, { recursive: true });
-      }
-
       const localPath = path.join(folderPath, uuidv4());
       fs.writeFileSync(localPath, Buffer.from(data, 'base64'));
-
       fileDocument.localPath = localPath;
 
       const result = await dbClient.db.collection('files').insertOne(fileDocument);
+
+      // Enqueue a job for thumbnail generation for image files
+      if (type === 'image') {
+        fileQueue.add({
+          fileId: result.insertedId.toString(),
+          userId,
+        });
+      }
 
       return res.status(201).json({
         id: result.insertedId.toString(),
@@ -224,43 +215,51 @@ class FilesController {
   static async getFile(req, res) {
     try {
       const { id } = req.params;
+      const { size } = req.query;
       const token = req.headers['x-token'] || null;
-  
+
       console.log('Fetching file data...');
       const file = await dbClient.db.collection('files').findOne({ _id: new ObjectId(id) });
-  
+
       if (!file) {
         console.log('File not found');
         return res.status(404).json({ error: 'Not found' });
       }
-  
+
       if (file.type === 'folder') {
         console.log('File is a folder');
         return res.status(400).json({ error: "A folder doesn't have content" });
       }
-  
+
       const isPublic = file.isPublic;
       let userId = null;
-  
+
       if (token) {
         const key = `auth_${token}`;
         console.log(`Fetching user ID from Redis with key: ${key}`);
         userId = await redisClient.get(key);
       }
-  
+
       if (!isPublic && (!userId || userId !== file.userId.toString())) {
         console.log('File is private and user is unauthenticated or not the owner');
         return res.status(404).json({ error: 'Not found' });
       }
-  
-      if (!fs.existsSync(file.localPath)) {
+
+      let filePath = file.localPath;
+      if (size) {
+        const validSizes = ['100', '250', '500'];
+        if (!validSizes.includes(size)) return res.status(400).json({ error: 'Invalid size' });
+        filePath = `${file.localPath}_${size}`;
+      }
+
+      if (!fs.existsSync(filePath)) {
         console.log('File not found on disk');
         return res.status(404).json({ error: 'Not found' });
       }
-  
+
       const mimeType = mime.lookup(file.name);
       res.setHeader('Content-Type', mimeType);
-      const fileContent = fs.readFileSync(file.localPath);
+      const fileContent = fs.readFileSync(filePath);
       return res.status(200).send(fileContent);
     } catch (err) {
       console.error('Error in GET /files/:id/data:', err);
