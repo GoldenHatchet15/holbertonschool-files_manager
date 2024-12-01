@@ -1,18 +1,23 @@
-import { Router } from 'express';
-import AppController from '../controllers/AppController.js';
+/* eslint-disable jest/require-hook */
+import express from 'express';
+import AppController from '../controllers/AppController';
 import UsersController from '../controllers/UsersController';
+import AuthController from '../controllers/AuthController';
+import FilesController from '../controllers/FilesController';
 
-const router = Router();
+const router = express.Router();
 
-// Define API routes
+// Define the endpoints
 router.get('/status', AppController.getStatus);
 router.get('/stats', AppController.getStats);
+
+// new route for creating a user
 router.post('/users', UsersController.postNew);
+
+// New authentication routes
 router.get('/connect', AuthController.getConnect);
 router.get('/disconnect', AuthController.getDisconnect);
-
-// User route
 router.get('/users/me', UsersController.getMe);
+router.post('/files', FilesController.postUpload);
 
-// Export the router
 export default router;
