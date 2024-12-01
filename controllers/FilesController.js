@@ -224,45 +224,46 @@ class FilesController {
   static async getFile(req, res) {
     try {
       const { id } = req.params;
-
-      // Find the file document by ID
+      const token = req.headers['x-token'] || null;
+  
+      console.log('Fetching file data...');
       const file = await dbClient.db.collection('files').findOne({ _id: new ObjectId(id) });
+  
       if (!file) {
+        console.log('File not found');
         return res.status(404).json({ error: 'Not found' });
       }
-
-      // Check if the file is a folder
+  
       if (file.type === 'folder') {
+        console.log('File is a folder');
         return res.status(400).json({ error: "A folder doesn't have content" });
       }
-
-      // Retrieve the user token and validate
-      const token = req.headers['x-token'];
-      if (!file.isPublic) {
-        if (!token) {
-          return res.status(404).json({ error: 'Not found' });
-        }
-
-        const userId = await redisClient.get(`auth_${token}`);
-        if (!userId || userId !== file.userId.toString()) {
-          return res.status(404).json({ error: 'Not found' });
-        }
+  
+      const isPublic = file.isPublic;
+      let userId = null;
+  
+      if (token) {
+        const key = `auth_${token}`;
+        console.log(`Fetching user ID from Redis with key: ${key}`);
+        userId = await redisClient.get(key);
       }
-
-      // Check if the file exists locally
-      const localPath = file.localPath;
-      if (!fs.existsSync(localPath)) {
+  
+      if (!isPublic && (!userId || userId !== file.userId.toString())) {
+        console.log('File is private and user is unauthenticated or not the owner');
         return res.status(404).json({ error: 'Not found' });
       }
-
-      // Determine the MIME type and return the file content
-      const mimeType = mime.lookup(file.name) || 'application/octet-stream';
+  
+      if (!fs.existsSync(file.localPath)) {
+        console.log('File not found on disk');
+        return res.status(404).json({ error: 'Not found' });
+      }
+  
+      const mimeType = mime.lookup(file.name);
       res.setHeader('Content-Type', mimeType);
-
-      const fileContent = fs.readFileSync(localPath);
+      const fileContent = fs.readFileSync(file.localPath);
       return res.status(200).send(fileContent);
     } catch (err) {
-      console.error('Error in /files/:id/data:', err);
+      console.error('Error in GET /files/:id/data:', err);
       return res.status(500).json({ error: 'Internal Server Error' });
     }
   }
