@@ -94,6 +94,89 @@ class FilesController {
       return res.status(500).json({ error: 'Internal Server Error' });
     }
   }
+
+  // Get a file document by id
+  static async getShow(req, res) {
+    try {
+      const token = req.headers['x-token'];
+      if (!token) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+  
+      const userId = await redisClient.get(`auth_${token}`);
+      if (!userId) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+  
+      const { id } = req.params;
+  
+      if (!ObjectId.isValid(id)) {
+        return res.status(404).json({ error: 'Not found' });
+      }
+  
+      const file = await dbClient.db.collection('files').findOne({
+        _id: new ObjectId(id),
+        userId: new ObjectId(userId),
+      });
+  
+      if (!file) {
+        return res.status(404).json({ error: 'Not found' });
+      }
+  
+      file.id = file._id.toString();
+      delete file._id;
+  
+      return res.status(200).json(file);
+    } catch (err) {
+      console.error('Error in /files/:id:', err);
+      return res.status(500).json({ error: 'Internal Server Error' });
+    }
+  }
+
+  // Get a list of file documents with pagination
+  static async getIndex(req, res) {
+    try {
+      // Authenticate user using token
+      const token = req.headers['x-token'];
+      if (!token) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+
+      const userId = await redisClient.get(`auth_${token}`);
+      if (!userId) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+
+      const parentId = req.query.parentId || '0';
+      const page = parseInt(req.query.page, 10) || 0;
+      const itemsPerPage = 20;
+
+      const filter = {
+        userId: new ObjectId(userId),
+        parentId: parentId === '0' ? '0' : new ObjectId(parentId),
+      };
+
+      const files = await dbClient.db.collection('files')
+        .aggregate([
+          { $match: filter },
+          { $skip: page * itemsPerPage },
+          { $limit: itemsPerPage },
+        ])
+        .toArray();
+
+      // Convert MongoDB ObjectIds to strings
+      const filesWithIds = files.map(file => ({
+        ...file,
+        id: file._id.toString(),
+        _id: undefined,
+      }));
+
+      return res.status(200).json(filesWithIds);
+    } catch (err) {
+      console.error('Error in /files:', err);
+      return res.status(500).json({ error: 'Internal Server Error' });
+    }
+  }
 }
 
 export default FilesController;
