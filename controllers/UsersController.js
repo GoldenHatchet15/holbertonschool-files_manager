@@ -36,37 +36,47 @@ class UsersController {
 
   static async getMe(req, res) {
     try {
+      console.log('Fetching user token...');
       const token = req.headers['x-token'];
-
       if (!token) {
-        console.log('Token is missing');
+        console.log('Missing token in request');
         return res.status(401).json({ error: 'Unauthorized' });
       }
-
+  
       const key = `auth_${token}`;
       console.log(`Fetching user ID from Redis with key: ${key}`);
       const userId = await redisClient.get(key);
-
+  
       if (!userId) {
-        console.log('No user found for the provided token');
+        console.log('Token not found in Redis or expired');
         return res.status(401).json({ error: 'Unauthorized' });
       }
-
-      console.log(`Fetching user from MongoDB with ID: ${userId}`);
-      const user = await dbClient.db.collection('users').findOne({ _id: new dbClient.ObjectId(userId) });
-
-      if (!user) {
-        console.log('No user found in MongoDB');
-        return res.status(401).json({ error: 'Unauthorized' });
+  
+      console.log(`User ID retrieved from Redis: ${userId}`);
+      console.log('Querying MongoDB for user...');
+  
+      try {
+        const objectId = new ObjectId(userId);
+        console.log(`Converted userId to ObjectId: ${objectId}`);
+        const user = await dbClient.db.collection('users').findOne({ _id: objectId });
+  
+        if (!user) {
+          console.log('User not found in MongoDB');
+          return res.status(404).json({ error: 'User not found' });
+        }
+  
+        console.log('User retrieved successfully:', user);
+        return res.status(200).json({ id: user._id, email: user.email });
+      } catch (mongoError) {
+        console.error('Error querying MongoDB:', mongoError);
+        return res.status(500).json({ error: 'Internal Server Error' });
       }
-
-      console.log(`User found: ${JSON.stringify(user)}`);
-      return res.status(200).json({ id: user._id.toString(), email: user.email });
     } catch (err) {
-      console.error('Error in getMe:', err);
+      console.error('Error in /users/me:', err);
       return res.status(500).json({ error: 'Internal Server Error' });
     }
   }
+  
 }
 
 export default UsersController;
